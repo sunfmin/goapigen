@@ -1,0 +1,20 @@
+<html>
+<head>
+	<title>Test</title>
+	<meta charset="utf-8">
+	<script type="text/javascript" src="http://code.jquery.com/jquery-1.8.3.min.js"></script>
+	<script type="text/javascript" src="sample.js"></script>
+</head>
+<body>
+
+<script type="text/javascript">
+	var g = new qortexapi.Global();
+	qortexapi.baseurl="http://localhost:9999/api"
+	var serv = g.GetAuthUserService("sessionstring")
+	serv.EditBroadcast("helloentryid", function(data, err){
+		console.log(data, err)
+	})
+
+</script>
+</body>
+</html>
