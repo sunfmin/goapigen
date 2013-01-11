@@ -26,11 +26,12 @@
 	}
 
 	qortexapi.Global.prototype.GetAuthUserService = function(session) {
-		return new qortexapi.AuthUserService(session)
+		var r = new qortexapi.AuthUserService()
+		r.session = session
+		return 
 	}
 
-	qortexapi.AuthUserService = function(session){
-		this.session = session
+	qortexapi.AuthUserService = function(){
 	}
 
 	qortexapi.AuthUserService.prototype.EditBroadcast = function(entryId, callback) {

@@ -1,4 +1,4 @@
-package goapigen
+package parser
 
 import (
 	"io"

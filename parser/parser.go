@@ -1,7 +1,7 @@
-package goapigen
+package parser
 
 import (
-	"fmt"
+	// "fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -22,7 +22,7 @@ func Parse(dir string) (r *APISet) {
 
 	// ast.Print(fset, foundPkg)
 	ast.Walk(w, foundPkg)
-
+	updateConstructors(w.APISet)
 	r = w.APISet
 
 	return
@@ -42,6 +42,8 @@ type Walker struct {
 func (w *Walker) Visit(node ast.Node) ast.Visitor {
 
 	switch n := node.(type) {
+	case *ast.Package:
+		w.APISet.Name = n.Name
 	case *ast.TypeSpec:
 		w.currentName = n.Name.Name
 	case *ast.StructType:
@@ -76,7 +78,7 @@ func (w *Walker) Visit(node ast.Node) ast.Visitor {
 	case *ast.Field:
 		if w.currentInterface != nil && len(n.Names) > 0 {
 			w.currentName = n.Names[0].Name
-			fmt.Println(w.currentName)
+			// fmt.Println(w.currentName)
 		}
 
 		if w.currentDataObject != nil && len(n.Names) > 0 {
@@ -86,6 +88,20 @@ func (w *Walker) Visit(node ast.Node) ast.Visitor {
 		}
 	}
 	return w
+}
+
+func updateConstructors(apiset *APISet) {
+	for _, inf := range apiset.Interfaces {
+		for _, inftarget := range apiset.Interfaces {
+			for _, m := range inftarget.Methods {
+				for _, f := range m.Results {
+					if f.Type == inf.Name {
+						m.ConstructorForInterface = inf
+					}
+				}
+			}
+		}
+	}
 }
 
 func parseField(n *ast.Field, f *Field) {

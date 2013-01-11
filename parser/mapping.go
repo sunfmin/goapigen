@@ -1,4 +1,4 @@
-package goapigen
+package parser
 
 var TypeMapping = map[string]TypeMap{
 	"ObjectiveC": TypeMap{
