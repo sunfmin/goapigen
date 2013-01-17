@@ -33,6 +33,29 @@ import ({{range .ServerImports}}
 var _ govalidations.Errors
 var _ = time.Sunday
 
+type CodeError interface {
+	Code() string
+}
+
+type SerializableError struct {
+	Code    string
+	Message string
+}
+
+func (s *SerializableError) Error() string {
+	return s.Message
+}
+
+func NewError(err error) (r error) {
+	se := &SerializableError{Message:err.Error()}
+	ce, yes := err.(CodeError)
+	if yes {
+		se.Code = ce.Code()
+	}
+	r = se
+	return
+}
+
 func AddToMux(prefix string, mux *http.ServeMux) {
 	{{range .Interfaces}}{{$interface := .}}{{range .Methods}}{{if .ConstructorForInterface}}{{else}}
 	mux.HandleFunc(prefix+"/{{$interface.Name}}/{{.Name}}.json", {{$interface.Name}}_{{.Name}}){{end}}{{end}}{{end}}
@@ -66,22 +89,30 @@ func {{$interface.Name}}_{{$method.Name}}(w http.ResponseWriter, r *http.Request
 	}
 	defer r.Body.Close()
 	dec := json.NewDecoder(r.Body)
-	dec.Decode(&p)
+	err := dec.Decode(&p)
 	var result {{$interface.Name}}_{{$method.Name}}_Results
+	enc := json.NewEncoder(w)
+	if err != nil {
+		result.Err = NewError(err)
+		enc.Encode(result)
+		return
+	}
 {{if $interface.Constructor}}
 	s, err := {{$interface.Constructor.FromInterface.Name | downcase }}.{{$interface.Constructor.Method.Name}}({{$interface.Constructor.Method.ParamsForGoServerConstructorFunction}})
 {{else}}
 	s := {{$interface.Name | downcase }}
-	var err error
 {{end}}
 	if err != nil {
-		result.Err = err
+		result.Err = NewError(err)
+		enc.Encode(result)
+		return
 	}
-	if result.Err == nil {
-		{{$method.ResultsForGoServerFunction "result"}} = s.{{$method.Name}}({{$method.ParamsForGoServerFunction}})
+	{{$method.ResultsForGoServerFunction "result"}} = s.{{$method.Name}}({{$method.ParamsForGoServerFunction}})
+	err = enc.Encode(result)
+	if err != nil {
+		panic(err)
 	}
-	enc := json.NewEncoder(w)
-	enc.Encode(result)
+	return
 }
 {{end}}{{end}}
 
@@ -126,7 +157,7 @@ func {{$interface.Name}}_{{$method.Name}}(w http.ResponseWriter, r *http.Request
 		return r;
 	}
 {{else}}
-	api.{{$interfaceName}}.prototype.{{.Name}} = function({{$method.ParamsForJavascriptFunction}}, callback) {
+	api.{{$interfaceName}}.prototype.{{.Name}} = function({{$method.ParamsForJavascriptFunction}}{{if $method.ParamsForJavascriptFunction}}, {{end}}callback) {
 		api.rpc("/{{$interfaceName}}/{{.Name}}.json", {"This": this, "Params": {{$method.ParamsForJson}}}, function(data){
 			callback({{$method.ResultsForJavascriptFunction "data"}})
 		});

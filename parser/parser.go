@@ -61,15 +61,13 @@ func (w *Walker) Visit(node ast.Node) ast.Visitor {
 		if w.currentInterface != nil {
 			w.currentMethod = &Method{Name: w.currentName}
 			for _, param := range n.Params.List {
-				f := &Field{}
-				parseField(param, f)
-				w.currentMethod.Params = append(w.currentMethod.Params, f)
+				fs := parseField(param)
+				w.currentMethod.Params = append(w.currentMethod.Params, fs...)
 			}
 
 			for _, result := range n.Results.List {
-				f := &Field{}
-				parseField(result, f)
-				w.currentMethod.Results = append(w.currentMethod.Results, f)
+				fs := parseField(result)
+				w.currentMethod.Results = append(w.currentMethod.Results, fs...)
 			}
 			if w.currentMethod.Results[len(w.currentMethod.Results)-1].Type != "error" {
 				panic("method " + w.currentMethod.Name + " of " + w.currentInterface.Name + "'s must additionally return 'err error'")
@@ -86,9 +84,8 @@ func (w *Walker) Visit(node ast.Node) ast.Visitor {
 		}
 
 		if w.currentDataObject != nil && len(n.Names) > 0 {
-			f := &Field{}
-			parseField(n, f)
-			w.currentDataObject.Fields = append(w.currentDataObject.Fields, f)
+			fs := parseField(n)
+			w.currentDataObject.Fields = append(w.currentDataObject.Fields, fs...)
 		}
 	}
 	return w
@@ -150,33 +147,38 @@ func typeDefinedIn(t string, apiset *APISet) (r bool) {
 	return false
 }
 
-func parseField(n *ast.Field, f *Field) {
-	f.Name = n.Names[0].Name
-	switch nt := n.Type.(type) {
-	case *ast.Ident:
-		f.Type = nt.Name
-	case *ast.SelectorExpr:
-		f.Type = nt.X.(*ast.Ident).Name + "." + nt.Sel.Name
-	case *ast.StarExpr:
-		f.Star = true
-		switch xt := nt.X.(type) {
+func parseField(n *ast.Field) (r []*Field) {
+	for _, id := range n.Names {
+		f := &Field{}
+		r = append(r, f)
+		f.Name = id.Name
+		switch nt := n.Type.(type) {
 		case *ast.Ident:
-			f.Type = xt.Name
+			f.Type = nt.Name
 		case *ast.SelectorExpr:
-			f.Type = xt.X.(*ast.Ident).Name + "." + xt.Sel.Name
-		}
-
-	case *ast.ArrayType:
-		var tname *ast.Ident
-		st, isstar := nt.Elt.(*ast.StarExpr)
-		if isstar {
+			f.Type = nt.X.(*ast.Ident).Name + "." + nt.Sel.Name
+		case *ast.StarExpr:
 			f.Star = true
-			tname = st.X.(*ast.Ident)
-		} else {
-			tname = nt.Elt.(*ast.Ident)
-		}
-		f.Type = tname.Name
-		f.IsArray = true
+			switch xt := nt.X.(type) {
+			case *ast.Ident:
+				f.Type = xt.Name
+			case *ast.SelectorExpr:
+				f.Type = xt.X.(*ast.Ident).Name + "." + xt.Sel.Name
+			}
 
+		case *ast.ArrayType:
+			var tname *ast.Ident
+			st, isstar := nt.Elt.(*ast.StarExpr)
+			if isstar {
+				f.Star = true
+				tname = st.X.(*ast.Ident)
+			} else {
+				tname = nt.Elt.(*ast.Ident)
+			}
+			f.Type = tname.Name
+			f.IsArray = true
+		}
 	}
+	return
+
 }
