@@ -1,10 +1,11 @@
 package parser
 
 import (
-	// "fmt"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 )
 
 func Parse(dir string) (r *APISet) {
@@ -69,8 +70,12 @@ func (w *Walker) Visit(node ast.Node) ast.Visitor {
 				fs := parseField(result)
 				w.currentMethod.Results = append(w.currentMethod.Results, fs...)
 			}
-			if w.currentMethod.Results[len(w.currentMethod.Results)-1].Type != "error" {
-				panic("method " + w.currentMethod.Name + " of " + w.currentInterface.Name + "'s must additionally return 'err error'")
+			if len(w.currentMethod.Results) == 0 {
+				die("method " + w.currentName + " must have return values or must have return value names like (entry *Entry, err error)")
+			} else {
+				if w.currentMethod.Results[len(w.currentMethod.Results)-1].Type != "error" {
+					die("method " + w.currentMethod.Name + " of " + w.currentInterface.Name + "'s must additionally return 'err error'")
+				}
 			}
 			w.currentInterface.Methods = append(w.currentInterface.Methods, w.currentMethod)
 			w.currentDataObject = nil
@@ -99,7 +104,7 @@ func updateConstructors(apiset *APISet) {
 					if f.Type == inf.Name {
 						m.ConstructorForInterface = inf
 						if inf.Constructor != nil {
-							panic(inf.Name + "'s constructor already is " + inf.Constructor.Method.Name + ", can only one constructor exists for one service")
+							die(inf.Name + "'s constructor already is " + inf.Constructor.Method.Name + ", can only one constructor exists for one service")
 						}
 						inf.Constructor = &Constructor{inftarget, m}
 					}
@@ -107,6 +112,11 @@ func updateConstructors(apiset *APISet) {
 			}
 		}
 	}
+}
+
+func die(message string) {
+	fmt.Println(message)
+	os.Exit(1)
 }
 
 func updateFields(apiset *APISet) {
