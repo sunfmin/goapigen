@@ -32,6 +32,8 @@ func main() {
 		printjavascript(*outdir, apis)
 	case "server":
 		printserver(*outdir, apis, *pkg, *impl)
+	case "objc":
+		printobjc(*outdir, apis)
 	}
 
 }
@@ -39,6 +41,13 @@ func main() {
 func die(message interface{}) {
 	fmt.Println(message)
 	os.Exit(0)
+}
+
+func dieIf(message interface{}, condition bool) {
+	if !condition {
+		return
+	}
+	die(message)
 }
 
 func codeTemplate() (tpl *template.Template) {
@@ -87,15 +96,23 @@ func printserver(dir string, apiset *parser.APISet, apipkg string, impl string) 
 	}
 }
 
+func printobjc(dir string, apiset *parser.APISet) {
+	tpl := codeTemplate()
+	hfile, err1 := os.Create(filepath.Join(dir, apiset.Name+".h"))
+	dieIf(err1, err1 != nil)
+	mfile, err2 := os.Create(filepath.Join(dir, apiset.Name+".m"))
+	dieIf(err2, err2 != nil)
+	err3 := tpl.ExecuteTemplate(hfile, "objc/h", apiset)
+	dieIf(err3, err3 != nil)
+	err4 := tpl.ExecuteTemplate(mfile, "objc/m", apiset)
+	dieIf(err4, err4 != nil)
+}
+
 func printjavascript(dir string, apiset *parser.APISet) {
 	tpl := codeTemplate()
 	p := filepath.Join(dir, apiset.Name+".js")
 	f, err := os.Create(p)
-	if err != nil {
-		panic(err)
-	}
+	dieIf(err, err != nil)
 	err = tpl.ExecuteTemplate(f, "javascript/interfaces", apiset)
-	if err != nil {
-		panic(err)
-	}
+	dieIf(err, err != nil)
 }

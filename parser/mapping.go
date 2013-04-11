@@ -1,20 +1,21 @@
 package parser
 
 var TypeMapping = map[string]TypeMap{
-	"ObjectiveC": TypeMap{
+	"objc": TypeMap{
 		KnownMapping: map[string]string{
-			"string":            "NSString *",
-			"int64":             "NSInteger *",
-			"int32":             "NSInteger *",
-			"int":               "NSInteger *",
-			"float64":           "NSNumber *",
-			"float32":           "NSNumber *",
-			"float":             "NSNumber *",
-			"bool":              "bool",
-			"error":             "NSError *",
-			"template.HTML":     "NSString *",
-			"template.HTMLAttr": "NSString *",
-			"time.Time":         "NSDate *",
+			"string":                  "NSString *",
+			"int64":                   "NSInteger *",
+			"int32":                   "NSInteger *",
+			"int":                     "NSInteger *",
+			"float64":                 "NSNumber *",
+			"float32":                 "NSNumber *",
+			"float":                   "NSNumber *",
+			"bool":                    "bool",
+			"error":                   "NSError *",
+			"template.HTML":           "NSString *",
+			"template.HTMLAttr":       "NSString *",
+			"time.Time":               "NSDate *",
+			"govalidations.Validated": "Validated *",
 		},
 		UnknownFunc: func(f Field) (r string) {
 			r = f.Type + " *"

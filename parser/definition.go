@@ -4,9 +4,15 @@ import (
 	"strings"
 )
 
+type Node interface {
+	NodeName() string
+	Children() []Node
+}
+
 type DataObject struct {
-	Name   string
-	Fields []*Field
+	Name       string
+	Fields     []*Field
+	ChildNodes []Node
 }
 
 type Constructor struct {
@@ -18,6 +24,23 @@ type Interface struct {
 	Name        string
 	Methods     []*Method
 	Constructor *Constructor
+	ChildNodes  []Node
+}
+
+func (do *DataObject) NodeName() string {
+	return do.Name
+}
+
+func (do *DataObject) Children() []Node {
+	return do.ChildNodes
+}
+
+func (inf *Interface) NodeName() string {
+	return inf.Name
+}
+
+func (inf *Interface) Children() []Node {
+	return inf.ChildNodes
 }
 
 type Method struct {
@@ -42,6 +65,25 @@ func (m *Method) ParamsForJavascriptFunction() (r string) {
 		ps = append(ps, p.Name)
 	}
 	r = strings.Join(ps, ", ")
+	return
+}
+
+func (m *Method) ParamsForObjcFunction() (r string) {
+	if len(m.Params) == 0 {
+		r = m.Name
+		return
+	}
+
+	ps := []string{}
+	for i, p := range m.Params {
+		op := p.ToLanguageField("objc")
+		name := op.Name
+		if i == 0 {
+			name = m.Name
+		}
+		ps = append(ps, name+":("+op.FullObjcTypeName()+")"+op.Name)
+	}
+	r = strings.Join(ps, " ")
 	return
 }
 
@@ -104,6 +146,14 @@ func (f Field) FullGoTypeName() (r string) {
 	return
 }
 
+func (f Field) FullObjcTypeName() (r string) {
+	if f.IsArray {
+		return "NSArray *"
+	}
+	r = f.Type
+	return
+}
+
 func (f Field) ToLanguageField(language string) (r Field) {
 	languageMap, ok := TypeMapping[language]
 	if !ok {
@@ -111,6 +161,9 @@ func (f Field) ToLanguageField(language string) (r Field) {
 	}
 
 	r.Name = f.Name
+	r.IsArray = f.IsArray
+	r.Star = f.Star
+	r.ImportName = f.ImportName
 	r.Type = languageMap.TypeOf(f)
 	return
 }

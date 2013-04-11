@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"sort"
 )
 
 func Parse(dir string) (r *APISet) {
@@ -25,6 +26,8 @@ func Parse(dir string) (r *APISet) {
 	ast.Walk(w, foundPkg)
 	updateConstructors(w.APISet)
 	updateFields(w.APISet)
+	sortDataObjects(w.APISet)
+	sortInterfaces(w.APISet)
 	r = w.APISet
 
 	return
@@ -123,39 +126,113 @@ func updateFields(apiset *APISet) {
 	for _, inf := range apiset.Interfaces {
 		for _, m := range inf.Methods {
 			for _, p := range m.Params {
-				if typeDefinedIn(p.Type, apiset) {
+				n := findDefiniationNode(p.Type, apiset)
+				if n != nil {
 					p.ImportName = apiset.Name
+					inf.ChildNodes = append(inf.ChildNodes, n)
 				}
 			}
 			for _, p := range m.Results {
-				if typeDefinedIn(p.Type, apiset) {
+				n := findDefiniationNode(p.Type, apiset)
+				if n != nil {
 					p.ImportName = apiset.Name
+					inf.ChildNodes = append(inf.ChildNodes, n)
 				}
 			}
 		}
 	}
 	for _, do := range apiset.DataObjects {
 		for _, f := range do.Fields {
-			if typeDefinedIn(f.Type, apiset) {
+			n := findDefiniationNode(f.Type, apiset)
+			if n != nil {
 				f.ImportName = apiset.Name
+				do.ChildNodes = append(do.ChildNodes, n)
 			}
 		}
 	}
 }
 
-func typeDefinedIn(t string, apiset *APISet) (r bool) {
+type byDepthDataObjects struct {
+	DataObjects []*DataObject
+}
+
+func (b byDepthDataObjects) Less(i, j int) bool {
+	return depth(b.DataObjects[i], 20) < depth(b.DataObjects[j], 20)
+}
+
+func (b byDepthDataObjects) Len() int { return len(b.DataObjects) }
+
+func (b byDepthDataObjects) Swap(i, j int) {
+	b.DataObjects[i], b.DataObjects[j] = b.DataObjects[j], b.DataObjects[i]
+}
+
+type byDepthInterfaces struct {
+	Interfaces []*Interface
+}
+
+func (b byDepthInterfaces) Less(i, j int) bool {
+	return depth(b.Interfaces[i], 20) < depth(b.Interfaces[j], 20)
+}
+
+func (b byDepthInterfaces) Len() int { return len(b.Interfaces) }
+
+func (b byDepthInterfaces) Swap(i, j int) {
+	b.Interfaces[i], b.Interfaces[j] = b.Interfaces[j], b.Interfaces[i]
+}
+
+func depth(n Node, maxdepth int) (r int) {
+	if maxdepth < 0 {
+		panic("loop dependency: " + n.NodeName())
+	}
+	// println(n.NodeName())
+
+	if len(n.Children()) == 0 {
+		return 1
+	}
+
+	max := 0
+	maxdepth = maxdepth - 1
+	for _, c := range n.Children() {
+		// ignore self reference
+		if n.NodeName() == c.NodeName() {
+			continue
+		}
+		// println("=> ", maxdepth, ":", c.NodeName())
+		d := depth(c, maxdepth)
+		if d > max {
+			max = d
+		}
+	}
+	r = max + 1
+	return
+}
+
+func sortDataObjects(apiset *APISet) {
+	sort.Sort(byDepthDataObjects{apiset.DataObjects})
+}
+
+func sortInterfaces(apiset *APISet) {
+	sort.Sort(byDepthInterfaces{apiset.Interfaces})
+}
+
+func findDefiniationNode(t string, apiset *APISet) (r Node) {
 	for _, do := range apiset.DataObjects {
 		if t == do.Name {
-			return true
+			return do
 		}
 	}
 	for _, inf := range apiset.Interfaces {
 		if t == inf.Name {
-			return true
+			return inf
 		}
 	}
-	return false
+	return
 }
+
+// func typeDefinedIn(t string, apiset *APISet) (r bool) {
+// 	n := findDefiniationNode(t, apiset)
+// 	return n != nil
+// }
 
 func parseField(n *ast.Field) (r []*Field) {
 	for _, id := range n.Names {
