@@ -126,28 +126,16 @@ func updateFields(apiset *APISet) {
 	for _, inf := range apiset.Interfaces {
 		for _, m := range inf.Methods {
 			for _, p := range m.Params {
-				n := findDefiniationNode(p.Type, apiset)
-				if n != nil {
-					p.ImportName = apiset.Name
-					inf.ChildNodes = append(inf.ChildNodes, n)
-				}
+				p.Update(apiset, inf)
 			}
 			for _, p := range m.Results {
-				n := findDefiniationNode(p.Type, apiset)
-				if n != nil {
-					p.ImportName = apiset.Name
-					inf.ChildNodes = append(inf.ChildNodes, n)
-				}
+				p.Update(apiset, inf)
 			}
 		}
 	}
 	for _, do := range apiset.DataObjects {
 		for _, f := range do.Fields {
-			n := findDefiniationNode(f.Type, apiset)
-			if n != nil {
-				f.ImportName = apiset.Name
-				do.ChildNodes = append(do.ChildNodes, n)
-			}
+			f.Update(apiset, do)
 		}
 	}
 }
@@ -213,20 +201,6 @@ func sortDataObjects(apiset *APISet) {
 
 func sortInterfaces(apiset *APISet) {
 	sort.Sort(byDepthInterfaces{apiset.Interfaces})
-}
-
-func findDefiniationNode(t string, apiset *APISet) (r Node) {
-	for _, do := range apiset.DataObjects {
-		if t == do.Name {
-			return do
-		}
-	}
-	for _, inf := range apiset.Interfaces {
-		if t == inf.Name {
-			return inf
-		}
-	}
-	return
 }
 
 // func typeDefinedIn(t string, apiset *APISet) (r bool) {

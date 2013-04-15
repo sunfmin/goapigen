@@ -1,12 +1,14 @@
 package parser
 
 import (
+	"fmt"
 	"strings"
 )
 
 type Node interface {
 	NodeName() string
 	Children() []Node
+	AddChild(n Node)
 }
 
 type DataObject struct {
@@ -35,12 +37,22 @@ func (do *DataObject) Children() []Node {
 	return do.ChildNodes
 }
 
+func (do *DataObject) AddChild(n Node) {
+	do.ChildNodes = append(do.ChildNodes, n)
+	return
+}
+
 func (inf *Interface) NodeName() string {
 	return inf.Name
 }
 
 func (inf *Interface) Children() []Node {
 	return inf.ChildNodes
+}
+
+func (inf *Interface) AddChild(n Node) {
+	inf.ChildNodes = append(inf.ChildNodes, n)
+	return
 }
 
 type Method struct {
@@ -125,11 +137,16 @@ func (m *Method) ParamsForJson() (r string) {
 }
 
 type Field struct {
-	IsArray    bool
-	Type       string
-	Name       string
-	Star       bool
-	ImportName string
+	IsArray                     bool
+	Type                        string
+	Name                        string
+	Star                        bool
+	ImportName                  string
+	PropertyAnnotation          string
+	SetPropertyConvertFormatter string
+	GetPropertyConvertFormatter string
+	Primitive                   bool
+	ConstructorType             string
 }
 
 func (f Field) FullGoTypeName() (r string) {
@@ -154,6 +171,45 @@ func (f Field) FullObjcTypeName() (r string) {
 	return
 }
 
+func (f Field) SetPropertyFromObjcDict(key string) (r string) {
+	r = fmt.Sprintf(f.SetPropertyConvertFormatter, "[dict valueForKey:@\""+key+"\"]")
+	return
+}
+
+func (f Field) GetPropertyToObjcDict(key string) (r string) {
+	r = fmt.Sprintf(f.GetPropertyConvertFormatter, key)
+	return
+}
+
+func (f Field) GetPropertyObjc() (r string) {
+	r = "self." + strings.Title(f.Name)
+	return
+}
+
+func findDefiniationNode(t string, apiset *APISet) (r Node) {
+	for _, do := range apiset.DataObjects {
+		if t == do.Name {
+			return do
+		}
+	}
+	for _, inf := range apiset.Interfaces {
+		if t == inf.Name {
+			return inf
+		}
+	}
+	return
+}
+
+func (f *Field) Update(apiset *APISet, parentNode Node) {
+	n := findDefiniationNode(f.Type, apiset)
+	f.Primitive = true
+	if n != nil {
+		f.ImportName = apiset.Name
+		f.Primitive = false
+		parentNode.AddChild(n)
+	}
+}
+
 func (f Field) ToLanguageField(language string) (r Field) {
 	languageMap, ok := TypeMapping[language]
 	if !ok {
@@ -164,7 +220,13 @@ func (f Field) ToLanguageField(language string) (r Field) {
 	r.IsArray = f.IsArray
 	r.Star = f.Star
 	r.ImportName = f.ImportName
-	r.Type = languageMap.TypeOf(f)
+	t := languageMap.TypeOf(f)
+	r.Type = t.Type
+	r.Primitive = f.Primitive
+	r.PropertyAnnotation = t.PropertyAnnotation
+	r.SetPropertyConvertFormatter = t.SetPropertyConvertFormatter
+	r.GetPropertyConvertFormatter = t.GetPropertyConvertFormatter
+	r.ConstructorType = t.ConstructorType
 	return
 }
 
