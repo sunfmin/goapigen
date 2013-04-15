@@ -12,7 +12,7 @@ var Templates = `
 	if (dict == nil) {
 		return self;
 	}
-{{range . }}{{$f := .ToLanguageField "objc"}}{{ $name := $f.Name | title }}{{if $f.Primitive }}	[self set{{$name}}:{{$name | $f.SetPropertyFromObjcDict}}];{{else}}{{if $f.IsArray}}
+{{range . }}{{$f := .ToLanguageField "objc"}}{{ $name := $f.Name | title }}{{if $f.Primitive }}{{if $f.IsArray}}	[self set{{$name}}:{{$f.SetPropertyObjc}}];{{else}}	[self set{{$name}}:{{$name | $f.SetPropertyFromObjcDict}}];{{end}}{{else}}{{if $f.IsArray}}
 	NSMutableArray * m{{$name}} = [[NSMutableArray alloc] init];
 	NSArray * l{{$name}} = [dict valueForKey:@"{{$name}}"];
 	for (NSDictionary * d in l{{$name}}) {
@@ -26,7 +26,7 @@ var Templates = `
 
 - (NSDictionary*) dictionary {
 	NSMutableDictionary * dict = [[NSMutableDictionary alloc] init];
-{{range . }}{{$f := .ToLanguageField "objc"}}{{ $name := $f.Name | title }}{{if $f.Primitive }}	[dict setValue:{{$f.GetPropertyObjc | $f.GetPropertyToObjcDict}} forKey:@"{{$name}}"];{{else}}{{if $f.IsArray}}
+{{range . }}{{$f := .ToLanguageField "objc"}}{{ $name := $f.Name | title }}{{if $f.Primitive }}{{if $f.IsArray}}	[dict setValue:{{$f.GetPropertyObjc}} forKey:@"{{$name}}"];{{else}}	[dict setValue:{{$f.GetPropertyObjc | $f.GetPropertyToObjcDict}} forKey:@"{{$name}}"];{{end}}{{else}}{{if $f.IsArray}}
 	NSMutableArray * m{{$name}} = [[NSMutableArray alloc] init];
 	for ({{$f.Type}} p in {{$name}}) {
 		[m{{$name}} addObject:[p dictionary]];
@@ -112,9 +112,9 @@ static {{.Name | title}} * _{{.Name}};
 	NSMutableURLRequest *httpRequest = [NSMutableURLRequest requestWithURL:url];
 	[httpRequest setHTTPMethod:@"POST"];
 	[httpRequest setValue:@"application/json;charset=utf-8" forHTTPHeaderField:@"Content-Type"];
-
+	{{$pkgName}} * _api = [{{$pkgName}} get];
 	NSData *requestBody = [NSJSONSerialization dataWithJSONObject:req options:NSJSONWritingPrettyPrinted error:error];
-	if([[{{$pkgName}} get] Verbose]) {
+	if([_api Verbose]) {
 		NSLog(@"Request: %@", [NSString stringWithUTF8String:[requestBody bytes]]);
 	}
 	[httpRequest setHTTPBody:requestBody];
@@ -126,7 +126,7 @@ static {{.Name | title}} * _{{.Name}};
 	if(*error != nil || returnData == nil) {
 		return nil;
 	}
-	if([[{{$pkgName}} get] Verbose]) {
+	if([_api Verbose]) {
 		NSLog(@"Response: %@", [NSString stringWithUTF8String:[returnData bytes]]);
 	}
 	return [NSJSONSerialization JSONObjectWithData:returnData options:NSJSONReadingAllowFragments error:error];
@@ -176,14 +176,15 @@ static {{.Name | title}} * _{{.Name}};
 	{{$interface.Name}}{{.Name}}Params *params = [[{{$interface.Name}}{{.Name}}Params alloc] init];
 	{{range .Params}}{{$f := .ToLanguageField "objc"}}[params set{{$f.Name | title}}:{{$f.Name}}];
 	{{end}}
-	NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%@/{{$interface.Name}}/{{.Name}}.json", [[Qortexapi get] BaseURL]]];
-	if([[{{$pkgName}} get] Verbose]) {
+	{{$pkgName}} * _api = [{{$pkgName}} get];
+	NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%@/{{$interface.Name}}/{{.Name}}.json", [_api BaseURL]]];
+	if([_api Verbose]) {
 		NSLog(@"Requesting URL: %@", url);
 	}
 	NSError *error;
-	NSDictionary * dict = [Qortexapi request:url req:[NSDictionary dictionaryWithObjectsAndKeys: [self dictionary], @"This", [params dictionary], @"Params", nil] error:&error];
+	NSDictionary * dict = [{{$pkgName}} request:url req:[NSDictionary dictionaryWithObjectsAndKeys: [self dictionary], @"This", [params dictionary], @"Params", nil] error:&error];
 	if(error != nil) {
-		if([[{{$pkgName}} get] Verbose]) {
+		if([_api Verbose]) {
 			NSLog(@"Error: %@", error);
 		}
 		[results setErr:error];

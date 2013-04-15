@@ -176,6 +176,11 @@ func (f Field) SetPropertyFromObjcDict(key string) (r string) {
 	return
 }
 
+func (f Field) SetPropertyObjc() (r string) {
+	r = "[dict valueForKey:@\"" + strings.Title(f.Name) + "\"]"
+	return
+}
+
 func (f Field) GetPropertyToObjcDict(key string) (r string) {
 	r = fmt.Sprintf(f.GetPropertyConvertFormatter, key)
 	return
